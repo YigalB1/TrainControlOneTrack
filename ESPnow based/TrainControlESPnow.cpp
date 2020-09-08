@@ -2,10 +2,9 @@
 
 #define MY_NAME   "Train Motor controller"
 
-struct __attribute__((packed)) dataPacket {
-  int slave_num;
-  int distance;
-};
+
+
+
 
 
 #define MOTOR_PWM 10
@@ -57,25 +56,30 @@ int speed_array[DIST_ARRAY_SIZE];
 int dist_cnt = 0;
 
 
+// the packet stracture
+struct __attribute__((packed)) dataPacket {
+  int slave_num;
+  int distance;
+};
 
+// called when a package is recieeved via ESPnow
+void dataReceived(uint8_t *senderMac, uint8_t *data, uint8_t dataLength) {
+  char macStr[18];
+  dataPacket packet;  
 
-class Slave {
-  public:
-    void Turn_led_ON ( int _side, int _led) {
-      Wire.beginTransmission(_side); // transmit to right device 
-      Wire.write(LED_CMD);          // send one byte CMD=2 (this means LED control on slave)
-      Wire.write(_led);          // sends one byte (3 means blue LED on)
-      Wire.endTransmission(); // stop transmitting
-      } // of Turn_led_ON
-    
-    void Turn_leds_OFF ( int _side) {
-      Wire.beginTransmission(_side); // transmit to right device 
-      Wire.write(LED_CMD);          // send one byte CMD=2 (this means LED control on slave)
-      Wire.write(LEDS_OFF_CMD);          // sends one byte (4 means turn all LEDs off on slave)
-      Wire.endTransmission(); // stop transmitting
-      } // of Turn_led_OFF
-}; // of Slave class
+  snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x", senderMac[0], senderMac[1], senderMac[2], senderMac[3], senderMac[4], senderMac[5]);
 
+  Serial.println();
+  Serial.print("Received data from: ");
+  Serial.println(macStr);
+  
+  memcpy(&packet, data, sizeof(packet));
+  
+  Serial.print("slave_num: ");
+  Serial.print(packet.slave_num);
+  Serial.print("  / ");
+  Serial.println(packet.distance);
+}
 
 
 class Motor {
@@ -108,7 +112,7 @@ class Motor {
 
 };
 
-Slave slave;
+
 Motor train_motor;
 int bad_reads_cnt = 0;
 int good_reads_cnt = 0;
@@ -120,55 +124,42 @@ int last_good_dist=IN_RANGE;
 void setup()
 {
   int l0, l1, l2, r0, r1, r2;
-  boolean I2C_OK = false, I2C_OKL, I2C_OKR;
-  
   
   pinMode(RED_LED, OUTPUT);
   pinMode(BLUE_LED, OUTPUT);
   pinMode(GREEN_LED, OUTPUT);
   
- digitalWrite(BLUE_LED, HIGH);
- delay(2000);
- digitalWrite(BLUE_LED, LOW);
+  Serial.begin(9600);
+  Serial.println();
+  Serial.print("Initializing...");
+  Serial.print(MY_NAME);
+  Serial.print(".  My MAC address is: ");
+  Serial.print(WiFi.macAddress());
+  
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();        // we do not want to connect to a WiFi network
+
+  if(esp_now_init() != 0) {
+    Serial.println("  ESP-NOW initialization failed");
+    return;
+    }
+
+  esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
+  esp_now_register_recv_cb(dataReceived);   // this function will get called once all data is sent
+  Serial.println("  ... ESPnow Initialized.");
 
 
   for (int i=0;i<DIST_BUFF_SIZE;i++) {
     dist_buffer[i]=  JUNK_VAL;
-  }
+    }
   train_motor.stop(); // make sure it is stopped
   time_prev = millis();
 
-  Wire.begin();
-  Serial.begin(9600);
-  Serial.println("Starting Setup");
-
-  while (!I2C_OK) {
-    Serial.println(">> Checking I2C: ");
-    I2C_OKL = I2C_check(left_dev);
-    I2C_OKR = I2C_check(right_dev);
-    I2C_OK = I2C_OKL && I2C_OKR;
-
-    if (I2C_OKL)
-      Serial.print("I2C left: OK  / ");
-    else
-      Serial.print("left: BAD / ");
-
-    if (I2C_OKR)
-      Serial.println("Right: OK");
-    else
-      Serial.println("Right: BAD");
-
-
-    if (!I2C_OK)
-      Serial.println("I2C: something is WRONG");
-    Serial.println(".........................");
-    
-    delay (1000);
-  }
+ 
+  delay (1000);
+  
 
  
-  Serial.println("I2C: both alive");
-
   train_speed = 0;
 
   l0 = read_distance(left_dev);
