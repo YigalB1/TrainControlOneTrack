@@ -1,36 +1,11 @@
-Skip to content
-Search or jump to…
+#include<espnow.h>
 
-Pull requests
-Issues
-Marketplace
-Explore
- 
-@YigalB1 
-YigalB1
-/
-TrainControlOneTrack
-1
-00
-Code
-Issues
-Pull requests
-Actions
-Projects
-Wiki
-Security
-Insights
-Settings
-TrainControlOneTrack/Train_motor_March_14_2020/Train_motor_March_14_2020.ino
-@YigalB1
-YigalB1 Add files via upload
-Latest commit 87f0950 on Apr 19
- History
- 1 contributor
-409 lines (335 sloc)  9.41 KB
-  
-// 15 March 2020 08:51
-#include <Wire.h>
+#define MY_NAME   "Train Motor controller"
+
+struct __attribute__((packed)) dataPacket {
+  int slave_num;
+  int distance;
+};
 
 
 #define MOTOR_PWM 10
